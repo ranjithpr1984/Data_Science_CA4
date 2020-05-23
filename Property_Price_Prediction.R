@@ -178,7 +178,6 @@ compare_ts_models <- function(df, house_type) {
     
     
     tslm_fit <- tslm(time_series ~ trend + season )
-
     county_accuracy[j-1,]$TSLM_AIC <- AIC(tslm_fit)
     county_accuracy[j-1,]$TSLM_BIC <- BIC(tslm_fit)
     county_accuracy[j-1,]$TSLM_MAPE <- accuracy(tslm_fit)[1,5]
@@ -189,27 +188,52 @@ compare_ts_models <- function(df, house_type) {
     else
       county_accuracy[j-1,]$Model_selected <- "ARIMA"
     
-    jpeg(paste(names(df)[j],"_",house_type,"_model_comparison.jpeg",sep = ""),width = 850, height = 435)
-    par(mfcol = c(1, 2))
-    par(mar=c(2,1,1,1))
+    #jpeg(paste(names(df)[j],"_",house_type,"_model_comparison.jpeg",sep = ""),width = 850, height = 435)
+    #par(mfcol = c(1, 2))
+    #par(mar=c(2,1,1,1))
     
-    autoplot(forecast(arima_fit, level = c(90), h = 36),
-         main = paste(names(df)[j], house_type, "Auto ARIMA forcast"))
-    autoplot(forecast(tslm_fit, level = c(90), h = 36),
-         main = paste(names(df)[j], house_type, "TSLM forcast"))
+    plot(forecast(arima_fit, level = c(90), h = 36),
+         main = paste(names(df)[j], house_type, "house price Auto ARIMA forcast"))
+    plot(forecast(tslm_fit, level = c(90), h = 36),
+         main = paste(names(df)[j], house_type, "house price TSLM forcast"))
 
-    dev.off()
+    #dev.off()
   }
   par(lopar)
   return(county_accuracy)
 }
 
-# Plot 3 years forcast for new houses
+# Compare predictive models for new house price
 prop_new_models <- compare_ts_models(prop_price_ts_new, "new")
 
-# Plot 3 years forcast for seond-hand houses price
+# Compare predictive models for second-hand house price
 prop_second_models <- compare_ts_models(prop_price_ts_second, "second-hand")
 
+# Function to build and evaluate ARIMA model for all counties
+evaluate_arima_model <- function(df, house_type) {
+  lopar <- par(no.readonly = TRUE)
+  Ljung_Box_pvalue <- numeric(ncol(df)-1)
+  for(j in 2:ncol(df)) {
+    fit <- auto.arima(df[,j])
+    Ljung_Box_pvalue[j-1] <- Box.test(fit$residuals, type = "Ljung-Box")$p.value
+    
+    #jpeg(paste(names(df)[j],"_",house_type,"_ARIMA_fit.jpeg",sep = ""),width = 850, height = 435)
+    qqnorm(fit$residuals,
+           main = paste(names(df)[j], house_type, "house price ARIMA fit"))
+    qqline(fit$residuals)
+    #dev.off()
+  }
+  par(lopar)
+  return(Ljung_Box_pvalue)
+}
+
+
+county_stats_new$Ljung_Box_pvalue <- evaluate_arima_model(prop_price_ts_new, 
+                                                          "new")
+county_stats_second$Ljung_Box_pvalue <- evaluate_arima_model(prop_price_ts_second, 
+                                                          "second-hand")
+county_stats_new$Ljung_Box_pvalue
+county_stats_second$Ljung_Box_pvalue
 #tmp <- prop_price_ts_new$Leitrim
 #ts_decompose <- stl(tmp, "periodic")
 #ts_decompose
