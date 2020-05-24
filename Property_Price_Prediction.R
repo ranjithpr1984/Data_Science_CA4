@@ -234,61 +234,82 @@ county_stats_second$Ljung_Box_pvalue <- evaluate_arima_model(prop_price_ts_secon
                                                           "second-hand")
 county_stats_new$Ljung_Box_pvalue
 county_stats_second$Ljung_Box_pvalue
-#tmp <- prop_price_ts_new$Leitrim
-#ts_decompose <- stl(tmp, "periodic")
-#ts_decompose
-#ts_seasonal_adjust <- seasadj(ts_decompose)
-#plot(tmp, type = "l")
-#plot(ts_seasonal_adjust, type = "l")
 
+# Funtion Validate arima model for all the counties.
+# This function find correlation between actual values and prediction.
+# Also plot prediction and actual value to visualise how well the prediction
+# fits actual value
+validate_arima_model <- function(df, house_type) {
+  #lopar <- par(no.readonly = TRUE)
+  n_county <- ncol(df) - 1;
+  corr_accuracy <- data.frame(names(df[,2:ncol(df)]),
+                              numeric(n_county),
+                              numeric(n_county),
+                              numeric(n_county),
+                              numeric(n_county),
+                              numeric(n_county))
 
-#
-#seasonplot(ts_seasonal_adjust, 12, col = rainbow(12), year.labels
-#           = TRUE, main = "Seasonal plot: Airpassengers")
-#
-#kpss.test(prop_price_ts_new$Dublin)
-#nsdiffs(prop_price_ts_new$Dublin)
-#ndiffs(prop_price_ts_new$Dublin)
-#stationaryTS <- diff(prop_price_ts_new$Dublin, differences = 1)
-#plot(stationaryTS, type = "l", main = "Differenced and Stationary") 
-#
-#fit <- auto.arima(prop_price_ts_second$Dublin)
-#fit
-#accuracy(fit)
-#
-#fit <- Arima(prop_price_ts_new$Dublin, order = c(0, 1, 1))
-#fit
-#accuracy(fit)
-#
-#qqnorm(fit$residuals)
-#qqline(fit$residuals)
-#
-#forecast(fit, 3)
-#
-#
-#Box.test(fit$residuals, type = "Ljung-Box")
-#
-#plot(window(prop_price_ts_new$Carlow,start=2019))
-#
-#install.packages("forecast")
-#library(forecast)
-#
-#pacf(log(window(prop_price_ts_new$Carlow,start=2015)))
-#?stl
-#ts_decompose <- stl(AirPassengers, "periodic")
-#
-#
-#trained_model <- lm(JohnsonJohnson ~ c(1:length(JohnsonJohnson)))
-#
-#  as.numeric(substr(as.character(min(prop_price_NMS[,1])),5,6))
-#
-#substr("abcdef", 2, 4)
-#
-#str(prop_price_ts_new)
-#cycle(prop_price_ts_new$Carlow)
-#cycle(window(prop_price_ts_new$Carlow,start=2015))
-#
-#
-#tmp <- ts(data = c(1,2,3,6,8,10,13,16,19),start = 2010 , frequency = 1)
-#adf.test(tmp)
-#plot(tmp)
+  names(corr_accuracy) <- c("county","predicted_point",
+                            "predicted_Lo_80","predicted_Hi_80",
+                            "predicted_Lo_95","predicted_Hi_95")
+  corr_accuracy$no_trend <- FALSE
+    
+  for(j in 2:ncol(df)) {
+    ts_train <- window(df[,j], 
+                       start = c(2015,1),
+                       end = c(2018,12))
+    ts_test <- window(df[,j], 
+                       start = c(2019,1))
+    fit <- auto.arima(ts_train)
+    
+    ts_predict <- forecast(fit,16)
+    actl_pred <- cbind(actuals = ts_test, predicted = ts_predict)
+    
+    act_pred_cor <- cor(actl_pred)[1,]
+    
+    corr_accuracy[j-1,]$predicted_point <- act_pred_cor["predicted.Point Forecast"]
+    corr_accuracy[j-1,]$predicted_Lo_80 <- act_pred_cor["predicted.Lo 80"]
+    corr_accuracy[j-1,]$predicted_Hi_80 <- act_pred_cor["predicted.Hi 80"]
+    corr_accuracy[j-1,]$predicted_Lo_95 <- act_pred_cor["predicted.Lo 95"]
+    corr_accuracy[j-1,]$predicted_Hi_95 <- act_pred_cor["predicted.Hi 95"]
+    corr_accuracy[j-1,]$no_trend <- (min(ts_predict[["mean"]]) == max(ts_predict[["mean"]]))
+    
+    #jpeg(paste(names(df)[j],"_",house_type,"_ARIMA_PREDICT_ACCURACY.jpeg",sep = ""),width = 850, height = 435)
+    plot(ts_predict,
+         include = 1,
+         main = paste(names(df)[j], house_type, "Prediction accuracy"))
+    lines(ts_test, col = "black",lwd = 2)
+    #dev.off()
+  }
+  par(lopar)
+  return(corr_accuracy)
+}
+
+corr_accuracy_new <- validate_arima_model(prop_price_ts_new, "new")
+corr_accuracy_second <- validate_arima_model(prop_price_ts_second,"second-hand")
+
+View(corr_accuracy_new)
+View(corr_accuracy_second)
+
+forecast_for_one_year <- function(df,counties) {
+  
+}
+
+tmp <- prop_price_ts_new$Meath
+ts_train <- window(tmp, 
+                   start = c(2015,1),
+                   end = c(2018,12))
+ts_test <- window(tmp, 
+                  start = c(2019,1))
+fit <- auto.arima(ts_train)
+
+ts_predict <- forecast(fit,16)
+plot(ts_predict, #include = 1,
+     main = "Cavan second-hand house price prediction line fit",
+     xlab = "Year",
+     ylab = "House price(in 1000s)"
+     )
+lines(tmp, col = "black",lwd = 2)
+abline(reg=lm(tmp ~ time(tmp)))
+View(ts_predict)
+min(ts_predict[["mean"]]) == max(ts_predict[["mean"]])
