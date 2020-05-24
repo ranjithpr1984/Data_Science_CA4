@@ -277,7 +277,7 @@ validate_arima_model <- function(df, house_type) {
     #jpeg(paste(names(df)[j],"_",house_type,"_ARIMA_PREDICT_ACCURACY.jpeg",sep = ""),width = 850, height = 435)
     plot(ts_predict,
          include = 1,
-         main = paste(names(df)[j], house_type, "Prediction accuracy"))
+         main = paste(names(df)[j], house_type, "house price Prediction accuracy"))
     lines(ts_test, col = "black",lwd = 2)
     #dev.off()
   }
@@ -291,25 +291,47 @@ corr_accuracy_second <- validate_arima_model(prop_price_ts_second,"second-hand")
 View(corr_accuracy_new)
 View(corr_accuracy_second)
 
-forecast_for_one_year <- function(df,counties) {
+forecast_one_year <- function(df,county, house_type) {
+  county_price_rise <- data.frame(county)
+  county_price_rise$price_rise_k <- 0
   
+  for(i in 1:length(county)) {
+    col_indx <- which(colnames(df)==county[i])
+    fit <- auto.arima(df[,col_indx])
+    ts_predict <- forecast(fit,12)
+    min_price <- round(min(ts_predict[["mean"]]))
+    max_price <- round(max(ts_predict[["mean"]]))
+    
+    #jpeg(paste(county[i],"_",house_type,"house_price_forecast.jpeg",sep = ""),width = 850, height = 435)
+    plot(ts_predict, include = 1,
+         main = paste(house_type, "house price one year forcast for", county[i]),
+         xlab = "Year",
+         ylab = "House price (in 1000s)")
+    abline(h = min_price, col = 3)
+    abline(h = max_price, col = 3)
+    axis(side = 4, at = c(min_price,max_price))
+    text(2020.4,
+         mean(c(min_price,max_price)),
+         paste("Expected rise in price : ", 
+               max_price-min_price, "k", sep = ""),
+         adj = 0,
+         col = 2)
+    county_price_rise[i,]$county <- county[i]
+    county_price_rise[i,]$price_rise_k <- max_price-min_price
+    #dev.off()
+  }
+  return(county_price_rise)
 }
 
-tmp <- prop_price_ts_new$Meath
-ts_train <- window(tmp, 
-                   start = c(2015,1),
-                   end = c(2018,12))
-ts_test <- window(tmp, 
-                  start = c(2019,1))
-fit <- auto.arima(ts_train)
-
-ts_predict <- forecast(fit,16)
-plot(ts_predict, #include = 1,
-     main = "Cavan second-hand house price prediction line fit",
-     xlab = "Year",
-     ylab = "House price(in 1000s)"
-     )
-lines(tmp, col = "black",lwd = 2)
-abline(reg=lm(tmp ~ time(tmp)))
-View(ts_predict)
-min(ts_predict[["mean"]]) == max(ts_predict[["mean"]])
+price_rise_new <- forecast_one_year(prop_price_ts_new,
+                                    c("Cork","Kildare", "Limerick",
+                                      "Louth", "Waterford"),
+                                    "New")
+price_rise_second <- forecast_one_year(prop_price_ts_second,
+                                       c("Kildare", "Meath", "Wicklow","Westmeath",
+                                         "Offaly", "Monaghan", "Tipperary", "Clare",
+                                         "Laois", "Galway", "Waterford", "Kerry",
+                                         "Cork"),
+                                       "Second-hand")
+View(price_rise_new)
+View(price_rise_second)
